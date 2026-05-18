@@ -1,13 +1,13 @@
 #include <LiquidCrystal.h>
 #include <PulseSensorPlayground.h>
-
+#include <string.h>
 // =====================================
 // PIN DEFINITIONS
 // =====================================
 
 #define SENSOR_PIN A0
 #define BUZZER_PIN 6
-#define PULSE_SENSOR_PIN A1
+#define PULSE_SENSOR_PIN A3
 #define PULSE_THRESHOLD 550
 
 // =====================================
@@ -28,10 +28,10 @@ PulseSensorPlayground pulseSensor;
 // =====================================
 
 // Drop detection threshold
-const int DROP_DELTA = 45;
+const int DROP_DELTA = 60;
 
 // Release threshold (hysteresis)
-const int RELEASE_DELTA = 20;
+const int RELEASE_DELTA = 35;
 
 // Minimum time between drops
 const unsigned long COOLDOWN_MS = 250;
@@ -82,7 +82,9 @@ unsigned long startTime = 0;
 
 int consecutiveHits = 0;
 
-String statusMessage = "NORMAL FLOW";
+const char* statusMessage = "NORMAL FLOW";
+
+int bpm=0; 
 
 // =====================================
 // BUZZER VARIABLES
@@ -128,7 +130,15 @@ void updateBuzzer()
 
 int readSmoothed()
 {
-    samples[sampleIndex] = analogRead(SENSOR_PIN);
+    // Flush ADC after channel switching
+    analogRead(SENSOR_PIN);
+    analogRead(SENSOR_PIN);
+
+    delayMicroseconds(100);
+
+    int stableReading = analogRead(SENSOR_PIN);
+
+    samples[sampleIndex] = stableReading;
 
     sampleIndex++;
 
@@ -146,7 +156,6 @@ int readSmoothed()
 
     return total / NUM_SAMPLES;
 }
-
 // =====================================
 // SETUP
 // =====================================
@@ -211,7 +220,15 @@ void loop()
     // READ SENSOR
     // =====================================
 
-    int raw = readSmoothed();
+static unsigned long lastDripRead = 0;
+static int raw = 0;
+
+if (millis() - lastDripRead >= 15)
+{
+    lastDripRead = millis();
+
+    raw = readSmoothed();
+}
 
     // =====================================
     // UPDATE BASELINE
@@ -314,6 +331,16 @@ void loop()
     }
 
     // =====================================
+    // HEARTBEAT DISPLAY
+    // =====================================
+   
+    if (pulseSensor.sawStartOfBeat())
+    {
+        bpm = pulseSensor.getBeatsPerMinute();
+
+    }
+
+    // =====================================
     // LCD UPDATE
     // =====================================
 
@@ -331,11 +358,23 @@ void loop()
         lcd.print("Flow:");
         lcd.print(flowRate, 1);
         lcd.print("mL/m");
-
         // Line 2
         lcd.setCursor(0, 1);
 
-        lcd.print(statusMessage);
+lcd.print("BPM:");
+lcd.print(bpm);
+
+lcd.print(" ");
+
+if (strcmp(statusMessage, "NORMAL FLOW") == 0)
+{
+    lcd.print("OK ");
+}
+else
+{
+    lcd.print("ALERT");
+}
+lcd.print("     ");
     }
 
     // =====================================
@@ -364,17 +403,5 @@ void loop()
         Serial.println(flowRate, 2);
     }
 
-    // =====================================
-    // OPTIONAL HEARTBEAT DISPLAY
-    // =====================================
 
-    /*
-    if (pulseSensor.sawStartOfBeat())
-    {
-        int bpm = pulseSensor.getBeatsPerMinute();
-
-        Serial.print("BPM: ");
-        Serial.println(bpm);
-    }
-    */
 }
