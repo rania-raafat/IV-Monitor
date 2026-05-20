@@ -1,9 +1,9 @@
 #include <LiquidCrystal.h>
 #include <PulseSensorPlayground.h>
 #include <string.h>
-// =====================================
+// ====================================
 // PIN DEFINITIONS
-// =====================================
+// ====================================
 
 #define SENSOR_PIN A0
 #define BUZZER_PIN 6
